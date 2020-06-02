@@ -1,0 +1,873 @@
+v2_9_1 - 19 Mar 2020 (dwd)
+  - Remove extra slash at the beginning of all http queries, introduced
+    in 2.8.21 (with the ipv6 square brackets feature).
+  - Make "Name or service not known" warning messages for proxyconfigurls
+    into debug messages, since it is recommended to try grid-wpad and wpad
+    even though in most cases the names do not exist.
+
+v2_9_0 - 22 Jan 2020 (dwd)
+  - Add the frontier_statistics C API.  Collects the number of queries,
+    the number of errors in fetches, and the min, max, and average of
+    both the number of bytes and elapsed milliseconds of queries.
+    When debug log level is enabled, the statistics are printed at the
+    end of the log.  Statistics are only collected when debugging is
+    enabled or after frontier_statistics_start() is called.
+  - Update fn-req to use the statistics API by reporting the kilobytes
+    per second of the transfer.
+
+v2_8_21 - 20 Dec 2019 (dwd)
+  - Fix a crash during print of the fatal error message when someone
+    specifies a proxyconfigurl without a serverurl.
+  - Use "Cache-Control: no-cache" instead of "Pragma: no-cache" when a
+    cache entry needs a hard refresh.  This change is needed for the
+    default configuration of squid-3 (and later) which ignores Pragma
+    when there is a Cache-Control header (and frontier-client always
+    sends one).
+  - Randomize the starting addresses used from round-robin DNS lookups.
+  - Fix compilation on centos8.
+  - Allow "http://" to be missing from URLs.  This change is to support
+    the proxy auto config standard which allows http:// to be missing
+    in the return PROXY.
+  - Allow square brackets to surround the host name in URLs, in order
+    to be able to parse IPv6 IP addresses without confusing the colons
+    in them with the beginning of a port number.
+  - In debug, warning, and error messages that include IP addresses,
+    put IPv6 addresses in square brackets and add colon and port
+    number when it is known.
+  - Add lower level details in the warning message about retrying after
+    a system error.
+  - Extend fn-fileget to read multiple chunks of data instead of one
+    big chunk.
+  - Add elapsed seconds to the frontierqueries output and the -secsfirst
+    option to order it first.
+
+v2_8_20 - 3 Nov 2016 (dwd)
+  - Fix bug introduced in v2_8_15 that caused a segmentation fault
+    when a DNS name lookup of proxies fail.  The fault happened in
+    the function frontierHttpClnt_usinglastproxyingroup().
+  - When both proxyconfigurl and proxyurl options are used, change the
+    priority so that proxies returned from proxyconfigurl are used
+    before proxyurls.  It used to be the opposite order.
+  - When proxyconfigurl options are used, ignore loadbalance=proxies.
+
+v2_8_19 - 12 Apr 2016 (dwd)
+  - Fix bug in the function that gets the name & IP address of servers
+    and proxies as a string.  This bug was introduced in v2_8_15.  The
+    function is supposed to return the host name followed by the IP
+    address in square brackets, however for proxies and for direct-
+    connect servers it was returning only the IP address in square
+    brackets.  This mostly affects warning & debug messages, but also
+    causes the digital signature checking option (security=sig) to
+    fail on direct-connect servers.
+  - Add support for $X509_CERT_DIR. If it is set and the capath option
+    is not set, it will be used as the directory containing CA certs
+    and CRLs instead of the default /etc/grid-security/certificates.
+
+v2_8_18 - 16 Feb 2016 (dwd)
+  - Change the ordering of the linking options on the frontier client
+    shared library, to get it to build properly on Ubuntu 12.04.
+
+v2_8_17 - 15 Feb 2016 (dwd)
+  - Move SSL cleanup function calls from when a frontier channel is 
+    deleted to the library finalizer, which is called by gcc when a
+    shared library is unloaded.  The cleanup calls in channel delete
+    were interfering with other uses of SSL in ATLAS.
+  - Fix bug/compiler warning introduced in 2.8.15 that prevented
+    proxyconfigurl=file://... from working.
+
+v2_8_16 - 4 Feb 2016 (dwd)
+  - Initialize the client loadbalance feature with a random number from
+    OpenSSL instead of getpid(), because when using cgroups all of the
+    process ids can be the same.
+
+v2_8_15 - 2 Feb 2016 (dwd)
+  - Fix bug present since 2.8.6 that considered a whole proxy group
+    failed if the last one failed, even if not all of the proxies in
+    the group had failures.  That could happen after a round-robin
+    group had been "shuffled" for load balancing.
+  - Slightly change the retry strategy to treat connection refused and
+    network unreachable errors the same as connection timeouts.
+  - Refactor the http client code to do a lot more sharing of code 
+    between servers and proxies.
+  - Treat IPv4 and IPv6 addresses present in the same DNS name as two
+    separate groups; in other words, when load balancing between
+    different addresses in a round-robin DNS name, stay within one IP
+    family.  Start with the preferred IP family and only advance to
+    the other IP family when all the addresses in that family had
+    errors.  If preferipfamily=0, the preferred family is considered
+    to be the family of the first address returned by the operating
+    system.
+  - Fix bug present since 2.8.9 where if a query did not send an Age
+    header because it was a fresh query, but a previous query on the
+    same connection did have an old Age header, a max-age exceeded
+    condition could be erroneously triggered and cause undesired
+    soft and hard refreshes.
+  - Treat an http error code 404 as a server error just like 5XX errors,
+    rather than a protocol error.  That means the proxy will be assumed
+    to be good and the server will be advanced.
+  - Export the common includes in the Makefile to http/Makefile,
+    because http source files include fn-internal.h which includes
+    openssl files which may not be in the standard places.  Requested
+    by CMS.
+
+v2_8_14 - 14 Oct 2015 (dwd)
+  - Fix bug introduced in v2_8_13 of using memory after it was freed.
+    The problem only showed up after running for 5 minutes, after
+    address info was freed in order to look up names in the DNS again.
+
+v2_8_13 - 9 Oct 2015 (dwd)
+  - Support IPv6 addresses.
+  - Add new complex connection string option "preferipfamily" which
+    controls the ordering of IP addresses tried when both IPv4 and
+    IPv6 values are present in a DNS lookup.  When set to "6", prefers
+    IPv6.  When set to "4", prefers IPv4.  When set to "0", uses the
+    order set by the operating system.  Default is "4".  When attempts
+    fail, all values are tried as before; this only controls the order.
+
+v2_8_12 - 13 Jul 2015 (dwd)
+  - Replace unhelpful "inconsistent result from poll" message that can
+    happen in 2.8.11 on a connect failure with more helpful "Connection
+    refused" or "Network unreachable".
+
+v2_8_11 - 27 Aug 2014 (dwd)
+  - Convert from using select() to poll() in order to be able to work
+    when more than FD_SETSIZE (1024) file descriptors are open.
+  - Move "extern"s for global variables to fn-internal.h instead of
+    separately declared in source files.
+
+v2_8_10 - 30 Jan 2014 (dwd)
+  - Correct segmentation fault caused by an incomplete conversion to
+    using ctime_r() instead of ctime().  This happens any time a job
+    requests data more than 5 minutes after the first time it requests
+    data.
+
+v2_8_9 - 2 Jan 2014 (dwd)
+  - Add support for a "forever" time-to-live ("ttl") for cache
+    expirations in addition to the previous "short" ttl.  The server
+    determines the amount of time to assign to each ttl level, but the
+    client determines which one to apply to each query.  Add new C++
+    API function Connection::setTimeToLive() and C API function
+    frontier_setTimeToLive() which take a "ttl" parameter that is 1
+    for short, 2 for long, and 3 for forever.  The default ttl is 2.
+    Deprecate the Connection::setReload() and frontier_setReload() API
+    functions where a true value is equivalent to setting a ttl to 1
+    with one of the new API functions.  
+  - Extend the forcereload complex connection string option and 
+    FRONTIER_FORCERELOAD environment variable so that a "long" or
+    "softlong" applies to short & long ttl only, and a "forever" or
+    "shortforever" applies to all ttls.  (By contrast the freshkey
+    option/FRONTIER_FRESHKEY variable is not extended to support
+    forever ttl).
+  - If the server requests a maximum cache age in the response payload
+    (not to be confused with the normal max cache age in the http
+    header), or if there was a protocol error (with a default maximum
+    cache age of 5 minutes), and the response is older than the
+    maximum age according to the http "Age" header from squid, then
+    first try a soft retry with that maximum cache age.  Formerly it
+    used to always do a soft retry with maximum cache age of 0 seconds
+    immediately after a protocol error.  This change avoids making a
+    server error condition worse by causing a flash overload with many
+    clients requesting retries at the same time.  If the soft retry
+    still returns a protocol error, continue to do a hard retry like
+    it used to.  New frontier servers (servlet version 3.33 or later)
+    also request a maximum cache age (default 5 minutes) on all empty
+    query responses because those can indicate temporary problems even
+    if they're not technically errors.
+  - Change fnget.py so it doesn't always request &sec=sig, since that
+    fails with newer servers that have no host certificates.  Instead,
+    add --sign option which appends the &sec=sig.
+  - Add '-R' option to fn-req to request "forever" time-to-live.  Add
+    the same option to fn-fileget and also the '-r' option that was
+    on fn-req for a "short" time-to-live.
+  - Change fn-fileget to honor the FRONTIER_RETRIEVEZIPLEVEL environment
+    variable and the retrieve-ziplevel complex connection string option,
+    except that unlike the regular frontier client the default is 0.
+  - Change fn-fileget to doubly URL-encode any characters in the file
+    path that aren't unreserved (that is, anything other than
+    alphanumeric, dash, underscore, forward slash, and period).  URL
+    encoding replaces the other characters with a % and 2 hex digits
+    of their ascii representation.  The % is also encoded (as %25) to
+    make it doubly-encoded, because it is decoded twice by the time
+    it reaches the Frontier servlet file plugin.
+  - When calculating the secure hash on the requested URL, do one
+    level of URL decoding (turning % and 2 hex digits into its ascii
+    equivalent) before calculating the hash, in order to match the
+    server which calculates the URL hash after one decoding.
+  - Extend the frontierqueries tool to put a '+' in the first column
+    for "forever" ttl queries similar to the '*' that's put there for
+    "short" ttl queries.
+  - Use ctime_r() instead of ctime() to get debug time stamps because
+    the latter is not thread-safe.
+
+v2_8_8 - 9 Jul 2013 (dwd)
+ - Fixed the exit code from the fn-fileget command so it returns a
+   zero on success and a one on failure rather than the opposite.
+
+v2_8_7 - 28 Jun 2013 (dwd)
+ - Added support for digital signatures on responses.  This is enabled
+   by the connection string option "(security=sig)".  This option
+   requires a directory of Certifying Authorities certificates and
+   CRLs which can be set with "(capath=/path/to/dir)". The default
+   path is /etc/grid-security/certificates.  Also requires frontier
+   servlet version of at least 3.30.  The signature is made up of a
+   SHA256 checksum of the requested URL plus the response, encrypted
+   with the RSA private key of the server's X509 host key.  The
+   server's X509 certificate is read from the server and verified by
+   openssl.  Either the certificate's primary subject name or one of
+   its alternate DNS names is required to match the host name in the
+   serverurl.  The signature is decrypted with the certificate's RSA
+   public key, and the resulting value is required to match the
+   calculated SHA256 checksum of the URL plus the response.
+ - Fix a segfault that happened when the application tries to do
+   another query after an error with all proxies & servers.  The
+   problem was introduced in the last release.
+ - Removed internal MD5 implementation and switched to use openssl's
+   implementation instead.
+ - Added -ldl to the library link line because that's needed by
+   Fedora 18.
+
+v2_8_6 - 29 Apr 2013 (dwd)
+ - Change retry strategy so that if a proxy or directly-connected server
+   translates to a round-robin DNS name and there are errors, all of the
+   IP addresses will be tried before giving up.  NOTE: this does not
+   extend to the case of servers being contacted through proxies, so
+   it is best to list all of the individual servers in a round-robin
+   service separately (after the round-robin name) in order to ensure
+   that all are tried through proxies.
+ - Proxy connect timeouts are now given special treatment, immediately
+   identifying them as proxy errors.
+ - Change retry strategy so that non-server errors will first try
+   every server with every proxy in a proxy group (those that have not
+   had connect timeouts), then every server with every proxy in the
+   next group, etc.  A proxy group is defined as either all proxyurls
+   if loadbalance=proxies or all IP addresses in a round-robin name in
+   a proxyurl or backupproxyurl.  Previously every proxy was tried
+   with the first server regardless of proxy group, then the next
+   server, etc, which was not optimal for far-away backup proxies.
+ - Whenever a request is made more than 5 minutes since the first one,
+   any current connection is now dropped, the proxy list is reset to
+   the beginning, all cached DNS names of proxies are cleared, all
+   proxy error flags are cleared, and the start time is reset so the
+   process can be done again 5 minutes later.  Servers are treated
+   similarly every 30 minutes.  Formerly, only the DNS name caches and
+   the corresponding error flags were cleared whenever 5 minutes had
+   elapsed.  
+ - The full current retry strategy is now documented in detail at
+     https://twiki.cern.ch/twiki/bin/view/Frontier/ClientRetryStrategy
+ - Add new connection string parameter "proxyconfigurl" which is a URL
+   to an internet-standard Proxy Auto Config (PAC) file for locating a
+   list of proxies.  Parameter may appear more than once, so that if a
+   config server can't be reached the next one is tried.  Each URL may
+   indicate a round-robin name, and if so all of the servers are tried.
+   The special value "auto" translates to "http://wpad/wpad.dat" which
+   is commonly used for the Web Proxy Auto Discovery standard.  Requires
+   pacparser library with a version greater than 1.3.0.  Since the
+   library is over a megabyte of code, it is loaded with dlopen.  The
+   url for this may be a "file://" type but if that fails it is a
+   fatal error.  Also the client IP address for matching inside the
+   PAC file is determined in a less reliable manner with file:// URLs.
+   Can specify a directory for the pacparser library install with 
+   the PACPARSER_DIR make variable.
+ - Add new environment variable FRONTIER_PROXYCONFIGS which is a
+   semicolon-separated list of proxyconfigurl values.
+ - Add new connection string parameter "maxagesecs=N" which sets the
+   header "Cache-control: max-age=N" so the client can control the
+   maximum cache age seconds when there's no reloading happening.
+   Setting "maxagesecs=0" is equivalent to "forcereload=softlong".
+ - If a memory allocation failure happens while retrieving data, return
+   immediately instead of trying all proxies and servers.
+ - Insert "mem_alloc: failed" messages in several places that handled
+   malloc failures but didn't set an error message.
+ - In the place most likely to get a memory allocation failure
+   (allocating for an entire uncompressed response), change the
+   message to also report the number of bytes that were attempted to
+   be allocated.
+ - Free a small malloced space that was leftover when reading the
+   subject name from $X509_USER_PROXY.
+
+v2_8_5 - 13 Dec 2011 (dwd)
+ - Fix bug that caused a segmentation fault when allocating the large
+   piece of memory for the query response failed.
+ - Fix bug where only the first channel accessed after a process forked
+   would close the socket connection, causing responses to get mixed up
+   between different processes.  Now it will close & reopen all channels
+   accessed. 
+
+v2_8_4 - 21 Jul 2011 (dwd)
+ - Fix bug that caused outgoing http connections to remain open after
+   the frontier client object was deleted, unless the last query
+   happened to have been a large one (>16kbyte).  This bug has existed
+   for 4-1/2 years, ever since persistent connections were implemented.
+   Most production code only uses one frontier client object so that's
+   probably why it wasn't noticed.  The problem was noticed in a CMS
+   tool that created and deleted the frontier object many times.
+
+v2_8_3 - 12 Jul 2011 (dwd)
+ - Fix bug that caused 'unzip unknown error' under relatively rare 
+   conditions.  The error code was actually reporting a normal
+   condition, it just wasn't being recognized as such.
+
+v2_8_2 - 30 Jun 2011 (dwd)
+ - Update the retry strategy so that when an error is not clearly a
+   server error (server errors imply that the proxy was good), try every
+   proxy with every server in turn.  Previously, non-server errors
+   would cause the strategy to do direct connections to all servers
+   after every proxy failed with just the first server.  The old
+   strategy was fine for CMS Offline where the first server is a
+   round-robin between all servers, but not good for CMS Online or
+   ATLAS where that is not the case.
+ - Make protocol error-induced reloads try "Cache-control: max-age=0"
+   before "Pragma: no-cache", because that's gentler on the servers
+   since it only asks for the modification times to be immedately
+   checked (that is, it revalidates the cache).  $FRONTIER_FORCERELOAD
+   variable still by default uses "Pragma: no-cache", but now if the
+   value begins with "soft" (that is, "softlong" or "softshort") it
+   uses the more gentle refresh.
+ - Do md5 calculations and unzipping (when needed) as the data is
+   received rather than waiting until all data is received .  This
+   gives a slight reduction in elapsed time because those calculations
+   can be interleaved with I/O.
+ - Turn low-level error messages into just debug messages when they are 
+   caught at a higher level and retried.  At the retrying level they
+   were already being printed as warning messages but the output was
+   confusing because it showed both 'error' and 'warn'.
+ - Include ServerError in the types of C++ exceptions that may be thrown.
+   Previously it would have been mapped to an UnknownError exception.
+
+v2_8_1 - 24 Feb 2011 (dwd)
+ - Add small fn-fileget command line tool that can retrieve files from
+   frontier servlets (release 3.28 or later) that are configured to 
+   serve files instead of database queries.
+    Usage: fn-fileget [-c connect_string] filepath ...
+   Honors all regular frontier environment variables, although it
+   doesn't support retrieve-ziplevel because it's assumed that files
+   can be pre-compressed.
+
+v2_8_0 - 17 Dec 2010 (dwd)
+ - The second digit in this release changed because the FrontierConfig
+   structure changed.  This only affects binary compatibilty for the
+   C interface, not the C++ interface used by all current users of
+   the frontier client.
+ - Fix segmentation fault that happens when there are no proxies
+   defined and the server gets errors.  Seen in ATLAS.
+ - Fix segmentation fault that happens when all proxies have had
+   errors but then a direct connect to server succeeds followed by
+   an error on the same persistent connection.  Seen in ATLAS.
+ - Change to using a '/' as a URL delimiter instead of '?' because the
+   the latter is not officially compatible with caching according to
+   the HTTP RFCs and requires a non-default squid configuration.
+   Requires Frontier servlet version 3.24 or greater.
+ - Put contents of new environment variable $FRONTIER_ID into the
+   beginning of the X-Frontier-Id header which is logged in squid and
+   the frontier servlet.  Overrides including $CMSSW_VERSION if it was
+   set.
+ - Add new complex connection string option "backupproxyurl" which is
+   very similar to proxyurl except that the specified proxies are
+   always tried after all proxyurls and they're not included in the
+   client load balancing done when loadbalance=proxies is set.  This
+   is intended to be used to identify proxies physically located near
+   the servers whose purpose is to catch client failures without
+   interfering with server operation.  Implies failovertoserver=no.
+ - Increase maximum number of allowed proxies from 16 to 24.  The
+   maximum number of allowed servers is still 16.
+ - Change the re-try strategy so that when the last server experiences
+   a server error but not all proxies have yet had errors, continue
+   trying with the next proxy.  It used to fail even if more proxies
+   were available.
+ - Add printing of IP addresses (when known) in addition to names in
+   the warning messages that identify proxies and servers.  This helps
+   in identifying the selected addresses in round-robins when there
+   are problems.
+ - Add -lcrypto to the libs because it is needed when being built
+   by gcc45.  Previously it was pulled in as a dependency of -lssl.
+   Requested by Peter Elmer.
+
+v2_7_15 - 14 May 2010 (dwd)
+ - Set clientcachemaxresultsize=0 by default, disabling the client
+   cache.
+
+v2_7_14 - 28 April 2010 (dwd)
+ - Support compilation on Mac OSX 10.6 Snow Leopard by changing link
+   options "-flat-namespace" to "-undefined dynamic_lookup".  In
+   order to make that to then work on 10.5 Leopard, removed
+   "-undefined suppress".
+ - Link libexpat into libfrontier_client shared library so it
+   becomes an implicit dependency.
+ - Remove the default building of a local copy of the expat library
+   and instead assume the library is available in the operating system
+   if the EXPAT_DIR command line isn't provided.
+ - Clean up linking of applications in the Makefile to no longer
+   explicitly include libraries which are implicitly pulled in by
+   the libfrontier_client shared library.
+
+v2_7_13 - 5 February 2010 (dwd)
+ - Support forking of the parent process by checking for a change in
+   process ID before every query and if it has then drop the socket
+   connection, close the debug log, and update the X-Frontier-ID header.
+ - Added support for an optional '%P' in the debug log file name which
+   is replaced by the current process id, including after a fork.
+ - Added '-F N' option to fn-req tool to fork after N iterations (which
+   are specified by '-C N'), in order to test forking.
+ - Remove trailing newlines from the 'encoding request' debug message
+   (they were already removed from the query).
+
+v2_7_12 - 13 January 2010 (dwd)
+ - Add a new freshkey option to complex connection strings.  Anything
+    in the value is added to the URLs used for queries, so that if a new
+    value is used the queries will be guaranteed to not be in a cache.
+    If the value begins with "long" that is removed and the rest of the
+    value is added to all queries, otherwise the value is added to only
+    "short" time-to-live queries.  If not present in the connection
+    string, may come from environment variable FRONTIER_FRESHKEY.
+    Default is no extra key.
+ - Avoid a possible segmentation fault when a connection socket needs
+    to be re-opened but the open fails.
+ - Avoid a segmentation fault when getpwent() fails (due to a problem
+    in the operating system).
+ - Include current proxy and server name in some http-level error
+    messages where it might be helpful to know.
+ - Separate out install target from dist target, and make the dist target
+    work even when 'distdir' is not the default.  The directory can now
+    be set with either installdir= or distdir= on the make command line.
+ - Change fn-req tool to handle more than one command line option at
+    once.
+ - Change fnget.py tool to handle keepalive messages that can come from
+    the frontier server for queries that take a long time to service.
+ - Switch from the GNU Lesser General Public License to the Fermitools
+    (BSD) license.
+
+v2_7_11 - 18 June 2009 (dwd)
+ - Whenever a system error happens on a proxy or server connection,
+    retry query once on a new connection.  This works around a
+    'connection reset by peer' problem seen on a percentage of CMS HLT
+    8-core nodes when 7 parallel applications connecting to localhost
+    squids was tried for the first time.
+ - Add new failovertoserver option to complex connection strings.
+    When set equal to no, direct connections to servers will not be
+    attempted after failures contacting a proxy.  Default yes.
+ - Remove the little fn-any application from the installation bin.
+
+v2_7_10 - 01 June 2009 (dwd)
+ - Use inflate zlib API instead of uncompress when uncompressing
+    payloads, analogous to the deflate change put in v2_7_9.  Pete
+    Elmer requested this too although he said it wasn't as important
+    as deflate.
+ - If 5 minutes has elapsed since a DNS name was looked up and the
+    name is needed again, re-lookup the name.  This also erases
+    the information about whether a particular address had an error so
+    failing addresses in a round-robin DNS will be tried once again.
+ - Added the destination IP address to read and write timeout warning
+    messages.
+ - Changed debug log output to close the log file only when the
+    frontier channel is closed, not after every message.  This makes
+    logging to AFS more than an order of magnitude faster, making the
+    performance impact of logging to AFS now imperceptible.
+ - Added printing the frontier client version number at the beginning of
+    debug logs.
+ - Added frontierqueries and fnget.py scripts to installation bin.
+ - Added -c option to fn-req test application to repeat the query a
+    specified number of times on the same connection.  This is useful
+    for load testing with small queries (as long as they are larger
+    than clientcachemaxresultsize).
+
+v2_7_9 - 10 October 2008 (dwd)
+ - Use deflate zlib API instead of compress2 when compressing URLs in
+    order to keep it initialized and avoid many large (~250KB)
+    allocations spread out over a run.  Requested by Pete Elmer.
+ - Treat 5XX HTTP errors as server errors instead proxy errors,
+    so the retry algorithm will move on to the next server instead
+    of the next proxy
+ - Send 'Cache-Control: max-stale=1' header on every request, as an
+    indication to the frontier server that the 5XX errors are handled
+    properly and it may send back 'Cache-Control: stale-if-error=1'
+    which tells squid 2.7 to return a 504 error if the server later
+    goes down after the data is expired rather than returning stale
+    data.
+ - Fixed a segmentation fault that can happen if an application tries
+    to do another query after an error that used up all servers
+    occurred (COOL sometimes does this).
+ - Added some extra includes in C++ files for gcc 4.3
+
+v2_7_8 - 20 June 2008 (dwd)
+ - Changed the retry strategy again, because the one introduced in
+    v2_7_5 last December did not correctly handle certain error
+    conditions.  This becomes especially apparent with the
+    (in-progress) upgrade to the frontier server (the upgrade that
+    improves cache consistency and greatly reduces the time for
+    database changes to reach clients); some types of errors would
+    have never been cleared from the caches with that server upgrade.
+    As part of this new strategy:
+    - Separated out the kind of protocol error that is explicitly
+      reported by a server (which is used almost exclusively for
+      database errors) to be a new type called server error.
+    - Repaired an inadvertent (but as it turns out, useful for
+      backward-compatibility in the new server upgrade) reporting of
+      other types of errors on the server (known in the client-server
+      protocol as a global error) from being an undefined error to
+      being a protocol error.
+    The new strategy is now this:
+    - If it was a server error, use only one proxy and cycle through
+      the servers.  Don't do any cache reloads because the error will
+      expire from the cache in 5 minutes (even with the current
+      frontier server) and we want it to stay there to avoid
+      overloading the server.  This is most like the former handling
+      for all protocol errors, except that it used to also have a
+      last-resort cache reload for all servers.
+    - Else if it was a protocol error, cycle through the proxies
+      using the first server and then cycle through direct connects
+      to servers, attempting a reload after every try.  This is
+      exactly like the original, pre-v2_7_5 strategy that was used
+      for all errors and will flush the cache of errors that
+      have been repaired.  This type of error is much less common
+      than server errors.
+    - Else do the same as protocol error except with no cache reloads.
+      This covers the cases of networking problems, machines that are
+      down, and proxy or server overloads without making overload
+      situations much worse by doing many reloads.
+ - Added tracking of errors on individual addresses listed in round-
+    robin DNS, just like did before when doing client-controlled load
+    balancing of proxies or servers, so that those addresses are not
+    reused except when all proxies have had at least one failure.
+ - When there's a hit in the local client cache, stopped "shuffling"
+    proxies and servers (that is, advancing the round-robin or
+    selecting a new random address when load balancing).  That was
+    only intended to be done just before opening a new connection to a
+    proxy or server.
+ - Fixed problem with client-controlled load balancing that caused a
+    failure on one address to give preferential treatment to the
+    working address listed after it; for example, if there were 3
+    servers and one had a failure, one of the remaining servers got
+    2/3 of the load and the other got 1/3.
+ - Increased the maximum length of an error message from 256 to 1024
+    bytes.
+ - Added timestamp to debug log when a channel is closed, and remove
+    trailing newlines from debug log timestamps.
+ - Removed trailing newlines from SQL requests sent to the frontier
+    server (although not from the debug log).
+ - Cleaned out a duplicate internal implementation of strdup().
+
+v2_7_7 - 14 February 2008 (dwd)
+ - Added a local client cache, for all queries that return a result
+    that is less than a specified size, default 10000 bytes.  The
+    default size may be overridden with complex connection string
+    keyword "clientcachemaxresultsize=NNN" where NNN is the maximum
+    result size (in bytes) that will be cached.  For typical current
+    CMSSW configurations this reduces the number of queries that are
+    sent to a server by an order of magnitude.
+ - Fixed bugs in the handling of the FrontierId when a grid 
+    certificate has a subject that has illegal characters or is very
+    long, and added '@' to the list of allowed characters.
+ - Increased the maximum number of proxies from 4 to 16 and the
+    maximum number of servers from 6 to 16.
+
+v2_7_6 - 21 December 2007 (dwd)
+This release is primarily about performance improvements, mainly
+    memory performance.  This was done in a binary-compatible way.
+ - Eliminate one copy of each data item that was kept in AnyData,
+    and instead refer directly to the copy in memory that contains
+    all the data items in a query.
+ - Delete memory copies as soon as possible so there is never more
+    than two needed to be held allocated at once.
+ - Decode base64-encoded data as soon as it is read, saving 25% for
+    its space (especially significant for non-zipped queries).
+ - Keep the original data read from the frontier server in 64KB
+    chunks rather than repeatedly doubling the allocated space
+    and copying the data over (again, especially significant for
+    non-zipped queries).
+ - Replace the base64 decoding function with a faster one.
+ 
+v2_7_5 - 11 December 2007 (dwd)
+ - Fixed a debug log buffer overflow for long messages that has caused
+    corrupted log messages and crashes for long queries.  Doubled the
+    buffer size, and made it safely truncate if a message is too long.
+ - When there are multiple addresses for a server name (round-robin
+    DNS), frontier client now cycles through the servers each time a
+    new connection is opened.
+ - Improved load balancing by dropping persistent connections after 
+    every large (>16k) query.  Some versions of squid were already
+    inconsistently dropping connections after large queries which
+    made load balancing much worse.
+ - Added options "loadbalance=proxies" and "loadbalance=servers" to 
+    randomly select which proxy or server (respectively) to try first
+    rather than starting at the beginning of the list.
+ - Changed the retry strategy to this:
+    1. Whenever a new connection is opened, reset the proxies &
+	servers lists to start the retry order at the beginning.  If
+	doing load balancing, also randomly select a new beginning
+	proxy or server.
+    2. If an error occurs, and it is a protocol error, assume the
+	problem is with the server so go to step 4.  Otherwise the
+	error is a network error, go to step 3.  If doing load
+	balancing, also mark the erring proxy or server so it won't be
+	tried again until all the proxies or servers have had errors.
+    3. If there are multiple proxies, try them all before attempting any
+	forced refreshes, and if all proxies fail then go back to the
+	begining of the proxy list and try refreshes on them all.
+    4. If those all fail, then try all the servers in order, and if
+	those all fail then go back to the beginning of the server list
+	and try refreshes on all of them.
+ - Eliminated a compiler warning on big endian Mac (PowerPC).
+ - Included a timestamp in warning messages about connection failures.
+ - Added server address to socket error messages.
+ - The debug log now includes the full size of objects even when they
+    aren't compressed.
+ - When $FRONTIER_LOG_FILE is set and begins with "+", and 
+    $FRONTIER_LOG_LEVEL is set to warning or debug, the "+" is now
+    removed from the log file name and warning messages get sent to
+    to stdout in addition to the log file.
+ - If $CMSSW_VERSION is set, it is now included in the "frontier-id"
+    header which is sent in queries so the server can log what version
+    of CMSSW is being used (if any).  If $CMSSW_VERSION is not set, it
+    now just says "client" in that place before the frontier client
+    version number (it used to say "GCC").
+ - Added a header to all source files except the few that are imported
+    from elsewhere which says that the source is covered under the
+    GNU LGPL.  Details in COPYING.
+
+v2_7_4 - 26 June 2007 (dwd)
+ - Fixed portability of build of builtin expat; it wasn't working on
+    64-bit Linux since version 2.7.3 because -fPIC gcc option wasn't
+    being used.  Also upgraded builtin expat from version 1.95.8 to
+    2.0.1.
+
+v2_7_3 - 25 May 2007 (dwd)
+ - Ported to Intel & PowerPC Mac.  Tested on Mac OS X 10.4.9 and
+   Xcode 2.4.1 (gcc 4.0.1).
+
+v2_7_2 - 23 March 2007 (dwd)
+ - Added a feature to use the subject name from a grid certificate
+   found at $X509_USER_PROXY if it is present, instead of the user's
+   name from /etc/passwd.
+ - Added OPENSSL_DIR Makefile command line variable to specify a
+   non-default directory for the openssl package.
+
+v2_7_1 - 22 March 2007 (dwd)
+ - Changed frontier_client library user-requested reload from 
+   immediate cache refresh to adding "&ttl=short" to the query URL.
+   This tells the Frontier servlet that the time-to-live of the cache
+   of the query should be a "short" time, as defined by the server.
+   This requires servlet version 3.5 to work properly; older servlet
+   versions will still work but everything will expire at the same
+   time.
+ - Added complex connection string option "forcereload" and
+   environment variable $FRONTIER_FORCERELOAD.  A value of "short"
+   in either forces an immediate cache refresh on the short time-to-
+   live queries and a value of "long" forces a refresh on all queries.
+   The default is "none".
+
+v2_7_0 - 4 January 2007 (dwd)
+ Note that this release is not binary compatible, although it is
+ source compatible.
+ - Dropped the _cms designation from version numbers.
+ - Changed AnyData::assignString() to avoid a new and delete for
+   non-"array" data types.  This is now preferred for client programs
+   to use in place of AnyData::getString() because it avoids a new and
+   delete for all data types.
+ - Added a private AnyData::getStrBuf() function to the C++ API to get
+   access to a re-usable buffer for array types, to avoid having to do
+   a new and delete for every piece of data that's of type array.
+   This is only intended to be used internally by the "friend" class
+   Session.
+ - Added support for persistent connections that can be re-used for
+   multiple queries.  The C++ API is to use two new C++ classes called
+   Connection and Session instead of the previous DataSource (although
+   that still works for backward source compatibility with one object
+   per query).  Create one Connection object to hold connections to
+   the frontier proxies & servers for a long time and create one
+   Session object for each query.  Sometimes (when there's too much
+   time between queries and when query results are large) the actual
+   TCP connection does get dropped by the squid proxy, but it is
+   automatically reconnected, transparent to the C++ API.
+ - Keep track of sequence numbers on channels and on queries within a
+   channel for debugging purposes.
+ - Move messages that report connection problems and retries from the
+   debug FRONTIER_LOG_LEVEL to the warning FRONTIER_LOG_LEVEL.
+ - Changed the default connect timeout from 3 seconds to 5 seconds.
+ - Added the ability to change the connect, read, and write timeout
+   seconds via environment variables FRONTIER_CONNECTTIMEOUTSECS,
+   FRONTIER_READTIMEOUTSECS, and FRONTIER_WRITETIMEOUTSECS or via
+   the complex connection string entries connecttimeoutsecs,
+   readtimeoutsecs, or writetimeoutsecs.
+ - Re-try selects if they fail with EINTR (which can happen when
+   profiling).
+ - Added --retrieve-zip-level to fnget.py.
+ - Added fnget2.py which is like fnget.py only supports multiple
+   queries per connection.
+
+v2_6_0_cms 09/18/2006 (dwd)
+ - Change only the version number because the binary API changed in
+   an incompatible way in v2_5_2_cms and that means a new second-level
+   version number should be started.
+
+v2_5_2_cms 09/13/2006 (dwd)
+ - Add debug messages for pre-encoded query, the beginning of the
+   post-decoded result, and the number of keepalives received (if any).
+ - Make the destructor of the FrontierException class be virtual
+   because Radovan Chytracek said it was causing stack corruption
+   when an exception occurred.
+
+v2_5_1_cms 08/07/2006 (dwd)
+ - Instead of overloading $FRONTIER_SERVER to mean both a list of
+   servers and the physical servers that correspond to the logical
+   server name, add environment variable $FRONTIER_PHYSICALSERVERS to
+   mean the latter.  If the DataSource::setDefaultParams API is not
+   used, its values now can come from FRONTIER_LOGICALSERVER and
+   FRONTIER_PHYSICALSERVERS.  Also, instead of ignoring the logical
+   server name when it is seen, the physical servers are now
+   substituted in its place (which is a little more intuitive).
+ - Added new keyword for complex parenthesized connection strings
+   called "logicalserverurl".  If it is defined, its value becomes the
+   logical server for later connections and the rest of the string
+   becomes the physical servers.   This was added because CORAL/POOL
+   uses one connection string for the first few frontier client
+   connections and then looks up subsequent connection strings in the
+   POOL file catalog.  I didn't want to have to have the long
+   connection strings in both places resulting in difficulty with
+   keeping them all the same, and CMS did not want to pass them in
+   environment variables, so I proposed this solution.
+
+v2_5_0_cms 07/26/2006 (dwd)
+ - Make uncompressing of zipped payload work with 64 bit compiler
+   (where a long is 8 bytes and int is still 4 bytes).
+ - Add notion of a "logical server" which is a server name that gets
+   ignored in favor of servers/proxies that have been set by other
+   means. 
+ - Add new C++ API class function DataSource::setDefaultParams which
+   takes parameters of a logical server name and a "parameter list"
+   which can be either a complex server connection string (see note
+   from v2_4_6_cms) or just a simple server string.  If this API is
+   not used, the values can come instead from optional environment
+   variables FRONTIER_LOGICALSERVER and FRONTIER_SERVER respectively.
+ - Added new optional environment variable FRONTIER_RETRIEVEZIPLEVEL
+   to set the retrieved zip level if it isn't set any other way.
+
+v2_4_7_cms 07/12/2006 (dwd)
+ - Fixed bug that limited the maximum number of servers and proxies to
+    3 instead of the intended 4.  Also, increased the maximum number of
+    servers to 6.  Removed the code that eliminated duplicate servers
+    and proxies because we may want to deliberately include duplicates
+    as part of a retry strategy.
+
+v2_4_6_cms 07/11/2006 (dwd)
+ - Added support for handling complex server connection strings
+   containing parenthesized keyword-value pairs.  This was added to
+   make it straightforward for higher CMS software levels to pass a
+   single string to specify one connection.   The format is
+   (keyword=value)...  where keyword is one of serverurl, proxyurl, or
+   retrieve-ziplevel.  Keywords can appear multiple times, and
+   anything between parenthesized components is ignored. 
+ - Reduced network timeouts when talking to frontier server:
+    - connect from 30 to 3 seconds - initial connect should be quick
+        and don't want to wait too long in case a server is down
+    - writes from 30 to 5 seconds - writes should be quick unless
+        queues are large, which shouldn't happen
+    - reads from 30 to 10 seconds - server now sends keepalives
+        every 5 seconds if it isn't doing anything
+ - Added support of ZLIB_DIR for the make command line to point to an
+   external zlib package different than the standard zlib
+
+v2_4_5_cms 06/16/2006 (dwd)
+ - prevent the attempted build of the internal expat from deleting
+   $(EXPAT_DIR) if it is passed on the make command line, and from
+   installing the internal expat into the external $(EXPAT_DIR).
+ - add showing the server version in the debug log
+
+v2_4_4_cms 06/07/2006 (dwd)
+ - added optional zipping of the retrieved payload.  The C++ API is
+   Request::setRetrieveZipLevel(level) where 0 is off, 1 is fastest,
+   5 is normal, and 9 is best compression.  Default is 5.  Requires
+   corresponding update in frontier servlet, version 3.1 or greater.
+ - eliminated another header file compile problem in FrontierException.hpp
+   just like the one recently fixed in frontier-cpp.h, and eliminated
+   a compile error seen when the inline LogicError constructor from
+   the same file is used
+ - eliminated some compiler warnings in frontier-cpp.h
+
+v2_4_3_cms 06/01/2006 (dwd)
+ - fixed a compile problem seen on amd64 in frontier-cpp.h
+ - added frontier_initdebug C function that accepts a debug log file name
+   and log level, and a frontier::init overloaded function that accepts
+   the same two parameters
+
+v2_4_2_cms 12/25/2005 (sv)
+ - support for configuring client with multiple servers/proxies
+ - initial work on exceptions for the C++ api
+
+v2_4_1_cms 10/25/2005 (sv)
+ - distribution changes: if external $EXPAT_DIR is provided, the expat
+   files will not be included in the frontier library; however, client
+   application will have to link against external libraries in $EXPAT_DIR/lib
+
+v2_4_0_cms 10/12/2005 (sv)
+ - cms pool clients seem to be working 
+ - fn-any, fn-req are not working against service on edge due to interface 
+   change relative to v2_3_1 release
+
+v2_1_2 01/20/2005
+ - bugs in NULL strings fixed
+ - diagnostic message from server now included into error message
+ - fn-any now shows strings in single quotes. Quotes and backslashes inside
+   strings are C-style escaped.
+ - for NULL strings fn-any pronts NULL (without quotes).
+Sergey Kosyakov, serge@fnal.gov 
+
+v2_1_1 01/10/2005
+ - bug in NULL fields support fixed
+ - compiles with GCC-3.4
+Sergey Kosyakov, serge@fnal.gov
+
+v2.0.2 10/25/2004
+ - bug which could destroy failover chain has been fixed
+ - library version changed to 2.0.2
+Sergey Kosyakov, serge@fnal.gov
+
+v2.0.1 10/25/2004
+ - MetaRequest class added; it requests column names and types information
+ - test-any.cc (fn-any) rewritten to use MetaRequest (example of usage)
+ - client passes process id, user id, user name and user full name (if set) in requests to server
+ - library version excavated to 2.0.1
+Sergey Kosyakov, serge@fnal.gov
+
+v1.1.2 09/17/2004
+- frontier.h and frontier-cpp.h moved into include/frontier_client for consistency
+- new method DataSource::isEOF() allows to verify full response demarshalling
+- two new methods for diag/benchmarking tools: DataSource:getRSBinarySize() and DataSource::getRSBinaryPos()
+- fn-any adapted to test isEOF()
+Sergey Kosyakov, serge@fnal.gov
+
+v1.1.1 (GCC only) 09/15/2004
+- compiled with CDF KIT gcc-3.3.1
+Sergey Kosyakov, serge@fnal.gov
+
+v1.1 09/14/2004
+- Per-thread (global if not threaded) error message holder
+- uniform error handling with detailed messages
+- number of error codes reduced to 7l they are logically combined in 4 groups
+- the library never calls abort() any more
+- attempt to refresh cache before server failover
+- uniform log report
+- 4 log levels: nolog, error, warning and debug
+- logs could be redirected to file (stdout by default)
+- 2 new environment variables to control log: FRONTIER_LOG_LEVEL and FRONTIER_LOG_FILE
+- automatic kit preparation when "make dist"
+- 4 executable into the KIT: fn-maincc, fn-maintest, fn-pescalib and fn-any
+- fn-any can show any XSD object as it is returned by the server
+- AnyData optimized by inlining and calls streamlining
+- new public call in DataSource: getAnyData(AnyData *any)
+- new public call in AnyData: isEOR()
+- "make all" (or just "make") now builds executables as well
+- EOR is fully supported now (see test-any.cc as an usage example)
+- the lib version elevated to 1.1.0
+Sergey Kosyakov, serge@fnal.gov
+
+v1.0.2
+LD_LIBRARY_PATH bug fixed
+Sergey Kosyakov, serge@fnal.gov
+
+v1.0.1
+The library name has been changed to libfrontier_client.so
+Sergey Kosyakov, serge@fnal.gov
+
+v1.0
+This is the first release of Frontier client API. 
+Sergey Kosyakov, serge@fnal.gov

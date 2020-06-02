@@ -1,0 +1,23 @@
+$Id$
+
+1. To compile:
+make
+
+2. To use in C application:
+#include <frontier_client/frontier.h>
+
+Link against -lfrontier_client
+
+3. To use in C++ application:
+#include <frontier_client/frontier-cpp.h>
+
+Link against -lfrontier_client
+
+4. Environment:
+export FRONTIER_SERVER[1234]=frontier_server
+export FRONTIER_PROXY[1234]=local_proxy
+export FRONTIER_LOG_LEVEL={nolog,info,debug}
+
+
+
+For more details, guides/manuals see http://frontier.cern.ch
